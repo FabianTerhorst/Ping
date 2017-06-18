@@ -61,13 +61,14 @@ public class RealCall implements Call {
 
     @Override
     public void enqueue(Callback callback) throws IOException {
-        process = processBuilder.start();
         canceled = false;
         ping.dispatcher().enqueue(new AsyncCall(callback));
     }
 
     public void cancel() {
-        process.destroy();
+        if (process != null) {
+            process.destroy();
+        }
         canceled = true;
     }
 
@@ -147,13 +148,10 @@ public class RealCall implements Call {
 
         private final Callback callback;
 
-        private final BufferedSource source;
-
         private final String name;
 
         AsyncCall(Callback callback) {
             this.callback = callback;
-            this.source = Okio.buffer(Okio.source(process.getInputStream()));
             this.name = "ping-" + originalRequest.destination;
         }
 
@@ -170,6 +168,8 @@ public class RealCall implements Call {
 
         private void execute() {
             try {
+                process = processBuilder.start();
+                BufferedSource source = Okio.buffer(Okio.source(process.getInputStream()));
                 readProcessStream(source, callback);
                 source.close();
             } catch (IOException io) {
