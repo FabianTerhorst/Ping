@@ -12,7 +12,6 @@ import okio.SourceDoubleUtils;
  * Created by fabianterhorst on 18.06.17.
  */
 
-//Todo: what happens on destroyed process read
 public class RealCall implements Call {
 
     private static final byte SPACE = ' ';
@@ -105,11 +104,11 @@ public class RealCall implements Call {
             }
             readOptions(source, responseBuilder);
 
-            callback.onResponse(this, responseBuilder.build());
-
             index = source.indexOf(NEW_LINE);
             source.skip(index + 2);// Skip '\r\n'
-        } while (index != -1);
+
+            callback.onResponse(this, responseBuilder.build());
+        } while (index != -1 && !canceled);
         callback.onFinish(this);
     }
 
