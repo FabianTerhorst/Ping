@@ -49,7 +49,7 @@ public class MainActivity extends AppCompatActivity {
 
                 @Override
                 public void onResponse(Call call, Response response) throws IOException {
-                    Log.d("ping", response.time() + " " + response.icmpSequence()  + " " + response.domain()  + " " + response.ip());
+                    Log.d("ping", response.time() + " " + response.icmpSequence()  + " " + response.domain().utf8());
                 }
 
                 @Override

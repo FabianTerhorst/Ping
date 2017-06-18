@@ -18,6 +18,7 @@ public class RealCall implements Call {
     private static final byte NEW_LINE = '\n';
     private static final byte OPENING_PARENTHESIS = '(';
     private static final byte CLOSING_PARENTHESIS = ')';
+    private static final byte COLON = ':';
 
     private static final Options FIELDS = Options.of(
             ByteString.encodeUtf8(" icmp_seq="),
@@ -87,13 +88,8 @@ public class RealCall implements Call {
             if (b >= '0' && b <= '9') {
                 response.packageSize = source.readDecimalLong();
                 source.skip(12); // Skip ' bytes from '
-                response.domain = source.readUtf8(source.indexOf(SPACE));
-                long domainStart = source.indexOf(OPENING_PARENTHESIS);
-                if (domainStart != -1) {
-                    source.skip(domainStart + 1); //Skip ' ('
-                    response.ip = source.readUtf8(source.indexOf(CLOSING_PARENTHESIS));
-                    source.skip(2); // Skip '):
-                }
+                response.domain = source.readByteString(source.indexOf(COLON));
+                source.skip(1);// ':'
             } else if (b == '-') {
                 //Todo: build summary
                 break;
