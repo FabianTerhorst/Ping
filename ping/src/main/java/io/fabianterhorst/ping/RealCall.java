@@ -16,6 +16,7 @@ public class RealCall implements Call {
 
     private static final byte SPACE = ' ';
     private static final byte NEW_LINE = '\n';
+    private static final byte OPENING_PARENTHESIS = '(';
     private static final byte CLOSING_PARENTHESIS = ')';
 
     private static final Options FIELDS = Options.of(
@@ -33,6 +34,8 @@ public class RealCall implements Call {
     private boolean canceled;
 
     private Request originalRequest;
+
+    private Response response = new Response();
 
     private Ping ping;
 
@@ -53,9 +56,7 @@ public class RealCall implements Call {
         } catch (IOException io) {
             callback.onFailure(this, io);
         } finally {
-            if (!canceled) {
-                process.destroy();
-            }
+            cancel();
         }
     }
 
@@ -66,7 +67,7 @@ public class RealCall implements Call {
     }
 
     public void cancel() {
-        if (process != null) {
+        if (process != null && !canceled) {
             process.destroy();
         }
         canceled = true;
@@ -83,14 +84,16 @@ public class RealCall implements Call {
         do {
             if (!source.request(1)) break;
             byte b = source.buffer().getByte(0);
-            Response.Builder responseBuilder = new Response.Builder();
             if (b >= '0' && b <= '9') {
-                responseBuilder.packageSize(source.readDecimalLong());
+                response.packageSize = source.readDecimalLong();
                 source.skip(12); // Skip ' bytes from '
-                responseBuilder.domain(source.readUtf8(source.indexOf(SPACE)));
-                source.skip(2); //Skip ' ('
-                responseBuilder.ip(source.readUtf8(source.indexOf(CLOSING_PARENTHESIS)));
-                source.skip(2); // Skip '):
+                response.domain = source.readUtf8(source.indexOf(SPACE));
+                long domainStart = source.indexOf(OPENING_PARENTHESIS);
+                if (domainStart != -1) {
+                    source.skip(domainStart + 1); //Skip ' ('
+                    response.ip = source.readUtf8(source.indexOf(CLOSING_PARENTHESIS));
+                    source.skip(2); // Skip '):
+                }
             } else if (b == '-') {
                 //Todo: build summary
                 break;
@@ -103,12 +106,12 @@ public class RealCall implements Call {
                     // Unknown Response
                 }
             }
-            readOptions(source, responseBuilder);
+            readOptions(source, response);
 
             index = source.indexOf(NEW_LINE);
             source.skip(index + 2);// Skip '\r\n'
 
-            callback.onResponse(this, responseBuilder.build());
+            callback.onResponse(this, response);
         } while (index != -1 && !canceled);
         callback.onFinish(this);
     }
@@ -116,28 +119,41 @@ public class RealCall implements Call {
     private void readInitializationLine(BufferedSource source, Callback callback) throws IOException {
         source.skip(5); // 'PING '
         String domain = source.readUtf8(source.indexOf(SPACE));
-        source.skip(2); // ' ('
-        String ip = source.readUtf8(source.indexOf(CLOSING_PARENTHESIS));
-        source.skip(2); // ') '
+        long index = source.indexOf(OPENING_PARENTHESIS);
+        final String ip;
+        if (index != -1) {
+            source.skip(index + 1);
+            ip = source.readUtf8(source.indexOf(CLOSING_PARENTHESIS));
+            source.skip(2); // ') '
+        } else {
+            ip = null;
+            source.skip(1); // Skip space
+        }
         long packageSize = source.readDecimalLong();
-        source.skip(1); // '('
-        long realPackageSize = source.readDecimalLong();
+        index = source.indexOf(OPENING_PARENTHESIS);
+        final long realPackageSize;
+        if (index != -1) {
+            source.skip(index + 1);
+            realPackageSize = source.readDecimalLong();
+        } else {
+            realPackageSize = -1;
+        }
         source.skip(source.indexOf(NEW_LINE) + 2); // Skip remaining line
         callback.onStart(this, domain, ip, packageSize, realPackageSize);
     }
 
-    private void readOptions(BufferedSource source, Response.Builder builder) throws IOException {
+    private void readOptions(BufferedSource source, Response response) throws IOException {
         int select;
         while ((select = source.select(FIELDS)) != -1) {
             switch (select) {
                 case 0: // icmp_seq
-                    builder.icmpSequence(source.readDecimalLong());
+                    response.icmpSequence = source.readDecimalLong();
                     break;
                 case 1: // ttl
-                    builder.ttl(source.readDecimalLong());
+                    response.ttl = source.readDecimalLong();
                     break;
                 case 2: // time
-                    builder.time(SourceDoubleUtils.readDecimalDouble(source)); //Todo: add time type (ms)
+                    response.time = SourceDoubleUtils.readDecimalDouble(source); //Todo: add time type (ms)
                     source.skip(3); // Skip ' ms'
                     break;
             }
@@ -175,9 +191,7 @@ public class RealCall implements Call {
             } catch (IOException io) {
                 callback.onFailure(RealCall.this, io);
             } finally {
-                if (!canceled) {
-                    process.destroy();
-                }
+                cancel();
                 ping.dispatcher().finished(this);
             }
         }
