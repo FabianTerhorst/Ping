@@ -28,7 +28,7 @@ public class MainActivity extends AppCompatActivity {
             ping.newCall(request).enqueue(new Callback() {
                 @Override
                 public void onStart(Call call, String domain, String ip, long packageSize, long realPackageSize) {
-                    Log.d("start", domain + " " + ip + " " + packageSize + " " + realPackageSize);
+                    Log.d("ping", "start " + domain + " " + ip + " " + packageSize + " " + realPackageSize);
                 }
 
                 @Override
@@ -43,7 +43,7 @@ public class MainActivity extends AppCompatActivity {
 
                 @Override
                 public void onFinish(Call call) {
-
+                    Log.d("ping", "finish");
                 }
             });
         } catch (IOException io) {
