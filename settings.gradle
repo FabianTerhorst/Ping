@@ -1,1 +1,1 @@
-include ':app', ':ping'
+include ':app', ':ping', ':arp'
