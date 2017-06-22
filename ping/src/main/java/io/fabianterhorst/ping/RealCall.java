@@ -15,10 +15,15 @@ import okio.SourceDoubleUtils;
 public class RealCall implements Call {
 
     private static final byte SPACE = ' ';
-    private static final byte NEW_LINE = '\n';
+    private static final byte NEW_LINE = '\r';
     private static final byte OPENING_PARENTHESIS = '(';
     private static final byte CLOSING_PARENTHESIS = ')';
     private static final byte COLON = ':';
+
+    private static final Options INIT_FIELDS = Options.of(
+            ByteString.encodeUtf8("PING"),
+            ByteString.encodeUtf8("unknown host")
+    );
 
     private static final Options FIELDS = Options.of(
             ByteString.encodeUtf8(" icmp_seq="),
@@ -35,8 +40,6 @@ public class RealCall implements Call {
     private boolean canceled;
 
     private Request originalRequest;
-
-    private Response response = new Response();
 
     private Ping ping;
 
@@ -79,63 +82,77 @@ public class RealCall implements Call {
     }
 
     //Todo: maybe prevent option reading for unknown response
-    private void readProcessStream(BufferedSource source, Callback callback) throws IOException {
-        readInitializationLine(source, callback);
-        long index;
-        do {
-            if (!source.request(1)) break;
-            byte b = source.buffer().getByte(0);
-            if (b >= '0' && b <= '9') {
-                response.packageSize = source.readDecimalLong();
-                source.skip(12); // Skip ' bytes from '
-                response.domain = source.readByteString(source.indexOf(COLON));
-                source.skip(1);// ':'
-            } else if (b == '-') {
-                //Todo: build summary
-                break;
-            } else {
-                index = source.indexOf(REQUEST_TIMEOUT);
-                if (index != -1) {
-                    // Timeout Request
-                    source.skip(index + REQUEST_TIMEOUT.size() + 4); // Skip 'Request timeout for'
+    void readProcessStream(BufferedSource source, Callback callback) throws IOException {
+        int status = readInitializationLine(source, callback);
+        if (status == Response.OK) {
+            long index;
+            do {
+                if (!source.request(1)) break;
+                Response response = new Response();
+                byte b = source.buffer().getByte(0);
+                if (b >= '0' && b <= '9') {
+                    response.packageSize = source.readDecimalLong();
+                    source.skip(12); // Skip ' bytes from '
+                    response.domain = source.readByteString(source.indexOf(COLON));
+                    source.skip(1);// ':'
+                    response.status = Response.OK;
+                } else if (b == '-') {
+                    //Todo: build summary
+                    break;
                 } else {
-                    // Unknown Response
+                    index = source.indexOf(REQUEST_TIMEOUT);
+                    if (index != -1) {
+                        // Timeout Request
+                        response.status = Response.TIMEOUT;
+                        source.skip(index + REQUEST_TIMEOUT.size() + 4); // Skip 'Request timeout for'
+                    } else {
+                        // Unknown Response
+                        response.status = Response.UNKNOWN;
+                    }
                 }
-            }
-            readOptions(source, response);
+                readOptions(source, response);
 
-            index = source.indexOf(NEW_LINE);
-            source.skip(index + 2);// Skip '\r\n'
+                index = source.indexOf(NEW_LINE);
+                source.skip(index + 2);// Skip '\r\n'
 
-            callback.onResponse(this, response);
-        } while (index != -1 && !canceled);
-        callback.onFinish(this);
+                callback.onResponse(this, response);
+            } while (index != -1 && !canceled);
+        }
+        callback.onFinish(this, status);
     }
 
-    private void readInitializationLine(BufferedSource source, Callback callback) throws IOException {
-        source.skip(5); // 'PING '
-        String domain = source.readUtf8(source.indexOf(SPACE));
-        long index = source.indexOf(OPENING_PARENTHESIS);
-        final String ip;
-        if (index != -1) {
-            source.skip(index + 1);
-            ip = source.readUtf8(source.indexOf(CLOSING_PARENTHESIS));
-            source.skip(2); // ') '
-        } else {
-            ip = null;
+    private int readInitializationLine(BufferedSource source, Callback callback) throws IOException {
+        int initField = source.select(INIT_FIELDS);
+        if (initField == 0) {
             source.skip(1); // Skip space
-        }
-        long packageSize = source.readDecimalLong();
-        index = source.indexOf(OPENING_PARENTHESIS);
-        final long realPackageSize;
-        if (index != -1) {
-            source.skip(index + 1);
-            realPackageSize = source.readDecimalLong();
+            String domain = source.readUtf8(source.indexOf(SPACE));
+            long index = source.indexOf(OPENING_PARENTHESIS);
+            final String ip;
+            if (index != -1) {
+                source.skip(index + 1);
+                ip = source.readUtf8(source.indexOf(CLOSING_PARENTHESIS));
+                source.skip(2); // ') '
+            } else {
+                ip = null;
+                source.skip(1); // Skip space
+            }
+            long packageSize = source.readDecimalLong();
+            index = source.indexOf(OPENING_PARENTHESIS);
+            final long realPackageSize;
+            if (index != -1) {
+                source.skip(index + 1);
+                realPackageSize = source.readDecimalLong();
+            } else {
+                realPackageSize = -1;
+            }
+            source.skip(source.indexOf(NEW_LINE) + 2); // Skip remaining line
+            callback.onStart(this, domain, ip, packageSize, realPackageSize);
+        } else if (initField == 1) {
+            return Response.UNKNOWN_HOST;
         } else {
-            realPackageSize = -1;
+            return Response.UNKNOWN;
         }
-        source.skip(source.indexOf(NEW_LINE) + 2); // Skip remaining line
-        callback.onStart(this, domain, ip, packageSize, realPackageSize);
+        return Response.OK;
     }
 
     private void readOptions(BufferedSource source, Response response) throws IOException {
