@@ -8,6 +8,13 @@ import okio.ByteString;
 
 public final class Response {
 
+    public static final int UNKNOWN = -1;
+    public static final int TIMEOUT = 0;
+    public static final int OK = 1;
+    public static final int UNKNOWN_HOST = 2;
+
+    int status;
+
     long packageSize;
 
     ByteString domain;
@@ -17,6 +24,10 @@ public final class Response {
     long ttl;
 
     double time;
+
+    public int status() {
+        return status;
+    }
 
     public long packageSize() {
         return packageSize;
