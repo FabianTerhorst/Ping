@@ -12,6 +12,8 @@ public final class Response {
     public static final int TIMEOUT = 0;
     public static final int OK = 1;
     public static final int UNKNOWN_HOST = 2;
+    public static final int CANCELED = 3;
+    public static final int INVALID = 4;
 
     int status;
 

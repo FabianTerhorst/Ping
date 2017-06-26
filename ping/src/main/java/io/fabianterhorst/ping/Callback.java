@@ -10,7 +10,8 @@ public interface Callback {
 
     void onStart(Call call, String domain, String ip, long packageSize, long realPackageSize);
 
-    void onFinish(Call call, int status /*TODO: add summary*/);
+    void onFinish(Call call, int status, long packagesTransmitted, long packagesReceived,
+                  double packagesLostPercent, double min, double avg, double max, double stdDev);
 
     void onFailure(Call call, IOException e);
 
