@@ -23,6 +23,6 @@ public class ExampleInstrumentedTest {
 
         assertEquals("io.fabianterhorst.ping.test", appContext.getPackageName());
 
-        Ping.to("google.com");
+        //Ping.to("google.com");
     }
 }

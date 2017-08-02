@@ -8,6 +8,9 @@ import android.util.Log;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.MulticastSocket;
 
 import io.fabianterhorst.ping.Call;
 import io.fabianterhorst.ping.Callback;
@@ -18,40 +21,49 @@ import okio.ByteString;
 
 public class MainActivity extends AppCompatActivity {
 
+    static final String ADDRESS = "239.255.255.250";
+    static final int PORT = 1900;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         Ping ping = new Ping();
+        Request request = new Request.Builder()
+                .destination("google.com")
+                .count(10)
+                //Todo: retryOnError bool when line is invalid
+                .build();
+        ping.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onStart(Call call, String domain, String ip, long packageSize, long realPackageSize) {
+                Log.d("ping", "start " + domain + " " + ip + " " + packageSize + " " + realPackageSize);
+            }
+
+            @Override
+            public void onFailure(Call call, IOException e) {
+                e.printStackTrace();
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                Log.d("ping", response.time() + " " + response.icmpSequence() + " " + response.domain().utf8());
+            }
+
+            @Override
+            public void onFinish(Call call, int status, long packagesTransmitted, long packagesReceived,
+                                 double packagesLostPercent, double min, double avg, double max, double stdDev) {
+                Log.d("ping", "finish");
+            }
+        });
+
         try {
-            Request request = new Request.Builder()
-                    .destination("google.com")
-                    .count(10)
-                    //Todo: retryOnError bool when line is invalid
-                    .build();
-            ping.newCall(request).enqueue(new Callback() {
-                @Override
-                public void onStart(Call call, String domain, String ip, long packageSize, long realPackageSize) {
-                    Log.d("ping", "start " + domain + " " + ip + " " + packageSize + " " + realPackageSize);
-                }
-
-                @Override
-                public void onFailure(Call call, IOException e) {
-                    e.printStackTrace();
-                }
-
-                @Override
-                public void onResponse(Call call, Response response) throws IOException {
-                    Log.d("ping", response.time() + " " + response.icmpSequence() + " " + response.domain().utf8());
-                }
-
-                @Override
-                public void onFinish(Call call, int status) {
-                    Log.d("ping", "finish");
-                }
-            });
-        } catch (IOException io) {
-            io.printStackTrace();
+            InetSocketAddress sSDPMultiCastGroup = new InetSocketAddress(ADDRESS, PORT);
+            MulticastSocket sSDPSocket = new MulticastSocket(new InetSocketAddress(InetAddress.getByName("239.255.255.250"), 0));
+            sSDPSocket.setSoTimeout(5);
+            sSDPSocket.joinGroup(sSDPMultiCastGroup, null);
+        }catch (Exception e) {
+            e.printStackTrace();
         }
     }
 

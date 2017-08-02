@@ -100,6 +100,7 @@ public class SourceDoubleUtils {
         } while (!done && sourceBuffer.head != null);
 
         sourceBuffer.size -= seen;
+        value = (double)Math.round(value * floatingDigit) / floatingDigit;
         return negative ? value : -value;
     }
 }

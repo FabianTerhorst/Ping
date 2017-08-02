@@ -12,6 +12,7 @@ import okio.SourceDoubleUtils;
  * Created by fabianterhorst on 18.06.17.
  */
 
+//Todo: change NEW_LINE to \r\n element
 public class RealCall implements Call {
 
     private static final byte SPACE = ' ';
@@ -50,13 +51,14 @@ public class RealCall implements Call {
     }
 
     @Override
-    public void execute(Callback callback) throws IOException {
-        process = processBuilder.start();
-        canceled = false;
+    public void execute(Callback callback) {
         try {
+            process = processBuilder.start();
+            canceled = false;
             BufferedSource source = Okio.buffer(Okio.source(process.getInputStream()));
             readProcessStream(source, callback);
-            source.close();
+            source.buffer().clear();//Todo: check, process will close all streams automatically
+            //source.close();
         } catch (IOException io) {
             callback.onFailure(this, io);
         } finally {
@@ -65,16 +67,15 @@ public class RealCall implements Call {
     }
 
     @Override
-    public void enqueue(Callback callback) throws IOException {
-        canceled = false;
+    public void enqueue(Callback callback) {
         ping.dispatcher().enqueue(new AsyncCall(callback));
     }
 
     public void cancel() {
         if (process != null && !canceled) {
             process.destroy();
+            canceled = true;
         }
-        canceled = true;
     }
 
     public boolean isCanceled() {
@@ -97,8 +98,33 @@ public class RealCall implements Call {
                     source.skip(1);// ':'
                     response.status = Response.OK;
                 } else if (b == '-') {
-                    //Todo: build summary
-                    break;
+                    source.skip(source.indexOf(NEW_LINE) + 2);
+                    if (!source.request(1)) break;
+                    b = source.buffer().getByte(0);
+                    if (b >= '0' && b <= '9') {
+                        long packagesTransmitted = source.readDecimalLong();
+                        source.skip(22); //Skip ' packets transmitted, '
+                        long packagesReceived = source.readDecimalLong();
+                        source.skip(19); //Skip ' packets received, '
+                        double packagesLostPercent = SourceDoubleUtils.readDecimalDouble(source);
+                        source.skip(source.indexOf(NEW_LINE) + 2);
+                        source.skip(32);//Skip 'round-trip min/avg/max/stddev = '
+                        double min = SourceDoubleUtils.readDecimalDouble(source);
+                        source.skip(1);// Skip '/'
+                        double avg = SourceDoubleUtils.readDecimalDouble(source);
+                        source.skip(1);// Skip '/'
+                        double max = SourceDoubleUtils.readDecimalDouble(source);
+                        source.skip(1);// Skip '/'
+                        double stdDev = SourceDoubleUtils.readDecimalDouble(source);
+                        source.skip(3); // Skip ' ms'
+                        //Todo: check the time type, normally 'ms'
+                        callback.onFinish(this, Response.OK, packagesTransmitted, packagesReceived,
+                                packagesLostPercent, min, avg, max, stdDev);
+                    } else {
+                        callback.onFinish(this, Response.INVALID, 0, 0,
+                                0, 0, 0, 0, 0);
+                    }
+                    return;
                 } else {
                     index = source.indexOf(REQUEST_TIMEOUT);
                     if (index != -1) {
@@ -118,7 +144,8 @@ public class RealCall implements Call {
                 callback.onResponse(this, response);
             } while (index != -1 && !canceled);
         }
-        callback.onFinish(this, status);
+        callback.onFinish(this, status == Response.OK ? Response.CANCELED : status,
+                0, 0, 0, 0, 0, 0, 0);
     }
 
     private int readInitializationLine(BufferedSource source, Callback callback) throws IOException {
@@ -196,17 +223,8 @@ public class RealCall implements Call {
         }
 
         private void execute() {
-            try {
-                process = processBuilder.start();
-                BufferedSource source = Okio.buffer(Okio.source(process.getInputStream()));
-                readProcessStream(source, callback);
-                source.close();
-            } catch (IOException io) {
-                callback.onFailure(RealCall.this, io);
-            } finally {
-                cancel();
-                ping.dispatcher().finished(this);
-            }
+            RealCall.this.execute(callback);
+            ping.dispatcher().finished(this);
         }
 
         public Call get() {
