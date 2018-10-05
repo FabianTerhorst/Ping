@@ -1,14 +1,13 @@
 apply plugin: 'com.android.library'
-
+apply plugin: 'kotlin-android'
 
 android {
-    compileSdkVersion 26
-    buildToolsVersion "26.0.0"
-
+    compileSdkVersion defCompileSdkVersion
+    buildToolsVersion defBuildToolsVersion
 
     defaultConfig {
-        minSdkVersion 14
-        targetSdkVersion 26
+        minSdkVersion defMinSdkVersion
+        targetSdkVersion defCompileSdkVersion
         versionCode 1
         versionName "1.0"
 
@@ -23,5 +22,6 @@ android {
 
 dependencies {
     testImplementation 'junit:junit:4.12'
-    implementation 'com.squareup.okio:okio:1.13.0'
+    implementation "com.squareup.okio:okio:$defOkioVersion"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
 }

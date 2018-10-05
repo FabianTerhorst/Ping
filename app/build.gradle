@@ -1,12 +1,13 @@
 apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
 
 android {
-    compileSdkVersion 26
-    buildToolsVersion "26.0.0"
+    compileSdkVersion defCompileSdkVersion
+    buildToolsVersion defBuildToolsVersion
     defaultConfig {
         applicationId "io.fabianterhorst.ping.sample"
-        minSdkVersion 14
-        targetSdkVersion 26
+        minSdkVersion defMinSdkVersion
+        targetSdkVersion defCompileSdkVersion
         versionCode 1
         versionName "1.0"
     }
@@ -19,11 +20,13 @@ android {
 }
 
 dependencies {
-    implementation 'com.android.support:appcompat-v7:25.4.0'
-    implementation 'com.android.support.constraint:constraint-layout:1.0.2'
+    implementation 'androidx.appcompat:appcompat:1.0.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.0.0-alpha2'
     implementation project (':ping')
     debugImplementation 'com.squareup.leakcanary:leakcanary-android:1.5.1'
     releaseImplementation 'com.squareup.leakcanary:leakcanary-android-no-op:1.5.1'
     testImplementation 'com.squareup.leakcanary:leakcanary-android-no-op:1.5.1'
-    implementation  "io.reactivex.rxjava2:rxjava:2.1.1"
+    implementation  "io.reactivex.rxjava2:rxjava:2.1.9"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+    implementation "com.squareup.okio:okio:$defOkioVersion"
 }

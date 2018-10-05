@@ -1,22 +1,30 @@
-// Top-level build file where you can add configuration options common to all sub-projects/modules.
-
 buildscript {
-
+    ext {
+        kotlin_version = "1.2.70"
+    }
     repositories {
-        maven { url 'https://maven.google.com' }
+        google()
         jcenter()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:3.0.0-alpha3'
-
-        // NOTE: Do not place your application dependencies here; they belong
-        // in the individual module build.gradle files
+        classpath 'com.android.tools.build:gradle:3.2.0'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
+}
+
+ext {
+    defKotlinVersion = "1.2.70"
+    defBuildToolsVersion = '28.0.3'
+    defAndroidXVersion = '1.0.0'
+    defMaterialVersion = '1.0.0'
+    defOkioVersion = '2.1.0'
+    defCompileSdkVersion = 28
+    defMinSdkVersion = 14
 }
 
 allprojects {
     repositories {
-        maven { url 'https://maven.google.com' }
+        google()
         jcenter()
     }
 }
